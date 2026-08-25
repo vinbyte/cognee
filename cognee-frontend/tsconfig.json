@@ -38,6 +38,8 @@
   "exclude": [
     "node_modules",
     "scripts",
-    "cognee-backend"
+    "cognee-backend",
+    "**/*.test.ts",
+    "**/*.test.tsx"
   ]
 }
