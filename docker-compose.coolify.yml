@@ -89,6 +89,11 @@ services:
       # users and is supported by the default Kuzu + LanceDB handlers above.
       ENABLE_BACKEND_ACCESS_CONTROL: "${ENABLE_BACKEND_ACCESS_CONTROL:-true}"
       REQUIRE_AUTHENTICATION: "${REQUIRE_AUTHENTICATION:-true}"
+      # The startup hook uses this account when it needs to bootstrap a fresh
+      # relational database. Set these to the real owner account in Coolify;
+      # do not rely on the development defaults for a public deployment.
+      DEFAULT_USER_EMAIL: "${DEFAULT_USER_EMAIL:?Set DEFAULT_USER_EMAIL in .env or Coolify}"
+      DEFAULT_USER_PASSWORD: "${DEFAULT_USER_PASSWORD:?Set DEFAULT_USER_PASSWORD in .env or Coolify}"
       FASTAPI_USERS_JWT_SECRET: "${FASTAPI_USERS_JWT_SECRET:-super_secret}"
       JWT_LIFETIME_SECONDS: "${JWT_LIFETIME_SECONDS:-86400}"
 
