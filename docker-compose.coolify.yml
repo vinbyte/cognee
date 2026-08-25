@@ -24,11 +24,20 @@ services:
       retries: 10
       start_period: 15s
 
+  fastembed-cache-init:
+    image: "${FASTEMBED_CACHE_INIT_IMAGE:-alpine:3.20}"
+    restart: "no"
+    volumes:
+      - fastembed_cache:/fastembed-cache
+    command: ["sh", "-c", "chown -R 1000:1000 /fastembed-cache"]
+
   cognee:
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
+      fastembed-cache-init:
+        condition: service_completed_successfully
     build:
       context: .
       dockerfile: Dockerfile

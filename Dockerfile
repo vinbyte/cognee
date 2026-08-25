@@ -79,8 +79,8 @@ WORKDIR /app
 # root-created database directory is unwritable for the uid-1000 MCP server).
 # Created before the COPY so ownership is set in that single layer — a
 # separate `chown -R /app` would copy the whole tree up into a second layer.
-# /cognee-storage is baked into the image cognee-owned so a fresh named
-# volume mounted there initializes with the right ownership.
+# /cognee-storage and /fastembed-cache are baked into the image cognee-owned
+# so fresh named volumes mounted there initialize with the right ownership.
 # ``chown cognee /app`` (the directory inode only): WORKDIR created /app as
 # root, and ``COPY --chown`` sets ownership on the copied content, not the
 # pre-existing target dir — without this the non-root user cannot create
@@ -88,7 +88,9 @@ WORKDIR /app
 RUN groupadd --system --gid 1000 cognee \
     && useradd --system --uid 1000 --gid cognee --no-create-home --shell /usr/sbin/nologin cognee \
     && mkdir -p /cognee-storage/system /cognee-storage/data \
+    && mkdir -p /fastembed-cache \
     && chown -R cognee:cognee /cognee-storage \
+    && chown -R cognee:cognee /fastembed-cache \
     && chown cognee:cognee /app
 
 COPY --from=uv --chown=cognee:cognee /app /app
