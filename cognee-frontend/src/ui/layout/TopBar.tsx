@@ -15,6 +15,8 @@ import { useTenant } from "@/modules/tenant/TenantContext";
 import useBoolean from "@/utils/useBoolean";
 import useOutsideClick from "@/utils/useOutsideClick";
 
+const localApiUrl = process.env.NEXT_PUBLIC_LOCAL_API_URL || "http://localhost:8000";
+
 // ── Icons ──
 
 function Chevron({ color = "rgba(255,255,255,0.45)", up = false }: { color?: string; up?: boolean }) {
@@ -74,6 +76,20 @@ export default function TopBar() {
   const pathname = usePathname();
   const { workspace, workspaces, setWorkspace } = useFilter();
   const { requestCreateWorkspace, availableTenants } = useTenant();
+
+  const handleLocalLogout = useCallback(async () => {
+    try {
+      await fetch(`${localApiUrl}/api/v1/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // The session cookie is cleared client-side by the API when available;
+      // redirect even if the backend is temporarily unreachable.
+    } finally {
+      window.location.assign("/local-login");
+    }
+  }, []);
 
   useEffect(() => {
     if (!cloud) getLocalUser().then((u) => { if (u) setLocalUser(u); });
@@ -156,6 +172,7 @@ export default function TopBar() {
           userName={user?.name || ""}
           userEmail={user?.email || ""}
           logoutHref={cloud ? "/api/signout" : "/api/local-signout"}
+          onLogout={cloud ? undefined : handleLocalLogout}
         />
       </div>
 

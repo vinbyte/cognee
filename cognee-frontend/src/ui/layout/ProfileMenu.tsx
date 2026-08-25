@@ -29,9 +29,10 @@ interface ProfileMenuProps {
   userEmail: string;
   profileHref?: string;
   logoutHref?: string;
+  onLogout?: () => void | Promise<void>;
 }
 
-export default function ProfileMenu({ userName, userEmail, profileHref = "/settings", logoutHref = "/api/signout" }: ProfileMenuProps) {
+export default function ProfileMenu({ userName, userEmail, profileHref = "/settings", logoutHref = "/api/signout", onLogout }: ProfileMenuProps) {
   const { value: isOpen, toggle, setFalse: close } = useBoolean(false);
   const closeCallback = useCallback(() => close(), [close]);
   const containerRef = useOutsideClick<HTMLDivElement>(closeCallback, isOpen);
@@ -99,10 +100,19 @@ export default function ProfileMenu({ userName, userEmail, profileHref = "/setti
 
           <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "2px -6px" }} />
 
-          {/* Log out — use <a> instead of <Link> to trigger a full page navigation to the API route */}
+          {/* Keep logout as a full navigation fallback, but allow local mode to
+              call the API directly so its host-only auth cookie is cleared. */}
           <a
-            href={logoutHref}
-            onClick={close}
+            href={onLogout ? "/local-login" : logoutHref}
+            onClick={(event) => {
+              if (onLogout) {
+                event.preventDefault();
+                close();
+                void onLogout();
+              } else {
+                close();
+              }
+            }}
             className="flex items-center gap-[10px] rounded-[6px] px-3 py-[10px]"
             style={{ fontSize: 13, color: "#F87171", textDecoration: "none" }}
             onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = "rgba(239,68,68,0.1)")}

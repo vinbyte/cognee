@@ -15,8 +15,12 @@ export async function GET(request: Request) {
     // Backend might be down — still clear cookies and redirect
   }
 
-  // Clear the fastapiusersauth cookie and redirect to local login
-  const response = NextResponse.redirect(new URL("/local-login", request.url));
+  // Use a relative Location so a reverse proxy cannot turn the redirect into
+  // its internal origin (for example, http://localhost:3000).
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: { Location: "/local-login" },
+  });
   response.cookies.set("fastapiusersauth", "", {
     maxAge: 0,
     path: "/",
