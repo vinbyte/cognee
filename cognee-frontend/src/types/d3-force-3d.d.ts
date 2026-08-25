@@ -1,11 +1,15 @@
 declare module "d3-force-3d" {
-  export function forceCollide(radius: number): {
-    radius(value: number): unknown;
+  type Force = ((alpha: number) => void) & {
+    initialize?: (...args: any[]) => void;
   };
 
-  export function forceManyBody(): {
-    strength(value: number): unknown;
-    distanceMin(value: number): unknown;
-    distanceMax(value: number): unknown;
+  export function forceCollide(radius: number): Force & {
+    radius(value: number): Force;
+  };
+
+  export function forceManyBody(): Force & {
+    strength(value: number): Force;
+    distanceMin(value: number): Force;
+    distanceMax(value: number): Force;
   };
 }
