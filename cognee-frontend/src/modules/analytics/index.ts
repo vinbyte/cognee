@@ -6,9 +6,17 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
+export type TrackEventParams = {
+  pageName?: string;
+  eventName?: string;
+  searchProperties?: Record<string, unknown>;
+  additionalProperties?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
 export function trackPageView(..._args: unknown[]) {}
 export function trackPageEvent(..._args: unknown[]) {}
-export function trackEvent(..._args: unknown[]) {}
+export function trackEvent(_params: TrackEventParams): void {}
 export function identifyUser(..._args: unknown[]) {}
 export function getSessionId() { return ""; }
 export function getSessionOrigin() { return ""; }
