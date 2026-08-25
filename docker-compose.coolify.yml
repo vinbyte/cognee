@@ -38,6 +38,8 @@ services:
         condition: service_healthy
       fastembed-cache-init:
         condition: service_completed_successfully
+    ports:
+      - "${COGNEE_API_PORT:-8000}:8000"
     build:
       context: .
       dockerfile: Dockerfile
@@ -117,6 +119,8 @@ services:
     depends_on:
       cognee:
         condition: service_healthy
+    ports:
+      - "${COGNEE_MCP_PORT:-8001}:8000"
     environment:
       # Streamable HTTP is the recommended transport for remote deployments;
       # clients connect to /mcp. The API URL uses Compose's internal DNS.
@@ -151,6 +155,8 @@ services:
     depends_on:
       cognee:
         condition: service_healthy
+    ports:
+      - "${COGNEE_FRONTEND_PORT:-3000}:3000"
     environment:
       NEXT_PUBLIC_LOCAL_API_URL: "${NEXT_PUBLIC_LOCAL_API_URL:-http://localhost:8000}"
       NEXT_PUBLIC_BACKEND_API_URL: "${NEXT_PUBLIC_BACKEND_API_URL:-http://localhost:8000}"
