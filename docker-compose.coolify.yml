@@ -36,8 +36,6 @@ services:
         # The API Dockerfile already includes fastembed. codegraph adds the
         # remaining code-analysis dependencies (notably transformers).
         COGNEE_EXTRAS: "${COGNEE_EXTRAS:-codegraph}"
-    ports:
-      - "8000:8000"
     environment:
       ENV: "${ENV:-prod}"
       DEBUG: "${DEBUG:-false}"
@@ -110,8 +108,6 @@ services:
     depends_on:
       cognee:
         condition: service_healthy
-    ports:
-      - "8001:8000"
     environment:
       # Streamable HTTP is the recommended transport for remote deployments;
       # clients connect to /mcp. The API URL uses Compose's internal DNS.
@@ -146,8 +142,6 @@ services:
     depends_on:
       cognee:
         condition: service_healthy
-    ports:
-      - "3000:3000"
     environment:
       NEXT_PUBLIC_LOCAL_API_URL: "${NEXT_PUBLIC_LOCAL_API_URL:-http://localhost:8000}"
       NEXT_PUBLIC_BACKEND_API_URL: "${NEXT_PUBLIC_BACKEND_API_URL:-http://localhost:8000}"
