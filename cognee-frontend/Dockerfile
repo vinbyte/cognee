@@ -18,5 +18,15 @@ COPY next.config.mjs .
 COPY postcss.config.mjs .
 COPY tsconfig.json .
 
-# Build the app and run it
-CMD ["npm", "run", "dev"]
+# Public environment variables are embedded by Next.js during the build.
+# docker-compose.coolify.yml passes these from .env/Coolify build arguments.
+ARG NEXT_PUBLIC_LOCAL_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT=false
+ENV NEXT_PUBLIC_LOCAL_API_URL=${NEXT_PUBLIC_LOCAL_API_URL}
+ENV NEXT_PUBLIC_BACKEND_API_URL=${NEXT_PUBLIC_BACKEND_API_URL}
+ENV NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT=${NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT}
+
+# Build and run the UI as a production Next.js server.
+RUN npm run build
+CMD ["npm", "run", "start"]

@@ -1,0 +1,160 @@
+# Production-oriented Compose stack for Coolify.
+#
+# Compose automatically reads .env from this directory. Every setting below
+# can be overridden there (or by Coolify's environment-variable UI).
+# Unlike the root docker-compose.yml, this file intentionally has no profiles
+# or custom network: Coolify routes the three public services while PostgreSQL
+# remains private on the Compose network.
+
+services:
+  postgres:
+    image: "${POSTGRES_IMAGE:-postgres:16-alpine}"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-cognee_db}"
+      POSTGRES_USER: "${POSTGRES_USER:-cognee}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or Coolify}"
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - cognee_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  cognee:
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # The API Dockerfile already includes fastembed. codegraph adds the
+        # remaining code-analysis dependencies (notably transformers).
+        COGNEE_EXTRAS: "${COGNEE_EXTRAS:-codegraph}"
+    ports:
+      - "8000:8000"
+    environment:
+      ENV: "${ENV:-prod}"
+      DEBUG: "${DEBUG:-false}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      SYSTEM_ROOT_DIRECTORY: "${SYSTEM_ROOT_DIRECTORY:-/cognee-storage/system}"
+      DATA_ROOT_DIRECTORY: "${DATA_ROOT_DIRECTORY:-/cognee-storage/data}"
+
+      # LLM configuration. LLM_API_KEY is intentionally required unless a
+      # different, fully local/provider-specific setup is supplied.
+      LLM_API_KEY: "${LLM_API_KEY:?Set LLM_API_KEY in .env or Coolify}"
+      LLM_PROVIDER: "${LLM_PROVIDER:-openai}"
+      LLM_MODEL: "${LLM_MODEL:-openai/gpt-5-mini}"
+      LLM_ENDPOINT: "${LLM_ENDPOINT:-}"
+
+      # CPU-friendly, multilingual local embeddings for Indonesian + English.
+      EMBEDDING_PROVIDER: "${EMBEDDING_PROVIDER:-fastembed}"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL:-intfloat/multilingual-e5-large}"
+      EMBEDDING_DIMENSIONS: "${EMBEDDING_DIMENSIONS:-1024}"
+      EMBEDDING_MAX_COMPLETION_TOKENS: "${EMBEDDING_MAX_COMPLETION_TOKENS:-512}"
+      EMBEDDING_BATCH_SIZE: "${EMBEDDING_BATCH_SIZE:-8}"
+      EMBEDDING_API_KEY: "${EMBEDDING_API_KEY:-}"
+      FASTEMBED_CACHE_PATH: "${FASTEMBED_CACHE_PATH:-/fastembed-cache}"
+
+      # PostgreSQL stores shared relational metadata, users, and ACLs. Dataset
+      # graph/vector isolation remains handled by Cognee's access-control-aware
+      # Kuzu + LanceDB handlers below.
+      DB_PROVIDER: "${DB_PROVIDER:-postgres}"
+      DB_HOST: "${DB_HOST:-postgres}"
+      DB_PORT: "${DB_PORT:-5432}"
+      DB_NAME: "${DB_NAME:-cognee_db}"
+      DB_USERNAME: "${DB_USERNAME:-cognee}"
+      DB_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env or Coolify}"
+      CACHE_BACKEND: "${CACHE_BACKEND:-postgres}"
+      GRAPH_DATABASE_PROVIDER: "${GRAPH_DATABASE_PROVIDER:-kuzu}"
+      GRAPH_DATASET_DATABASE_HANDLER: "${GRAPH_DATASET_DATABASE_HANDLER:-kuzu}"
+      VECTOR_DB_PROVIDER: "${VECTOR_DB_PROVIDER:-lancedb}"
+      VECTOR_DATASET_DATABASE_HANDLER: "${VECTOR_DATASET_DATABASE_HANDLER:-lancedb}"
+
+      # Multi-tenant mode is the secure default. It requires authenticated
+      # users and is supported by the default Kuzu + LanceDB handlers above.
+      ENABLE_BACKEND_ACCESS_CONTROL: "${ENABLE_BACKEND_ACCESS_CONTROL:-true}"
+      REQUIRE_AUTHENTICATION: "${REQUIRE_AUTHENTICATION:-true}"
+      FASTAPI_USERS_JWT_SECRET: "${FASTAPI_USERS_JWT_SECRET:-super_secret}"
+      JWT_LIFETIME_SECONDS: "${JWT_LIFETIME_SECONDS:-86400}"
+
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:3000}"
+
+    volumes:
+      - cognee_system:/cognee-storage/system
+      - cognee_data:/cognee-storage/data
+      - fastembed_cache:/fastembed-cache
+      # Put repositories to index under this host path. Set
+      # CODE_REPOSITORIES_PATH in .env to change it. The code graph pipeline
+      # reads repositories from inside the API container at /repos.
+      - "${CODE_REPOSITORIES_PATH:-./repositories}:/repos:ro"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  cognee-mcp:
+    image: "${MCP_IMAGE:-cognee/cognee-mcp:main}"
+    restart: unless-stopped
+    depends_on:
+      cognee:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+    environment:
+      # Streamable HTTP is the recommended transport for remote deployments;
+      # clients connect to /mcp. The API URL uses Compose's internal DNS.
+      TRANSPORT_MODE: "${TRANSPORT_MODE:-http}"
+      API_URL: "${API_URL:-http://cognee:8000}"
+      # Required when the backend keeps multi-tenant authentication enabled.
+      # Supply a valid Cognee Bearer/JWT token in .env or Coolify.
+      API_TOKEN: "${API_TOKEN:-}"
+      MCP_ALLOWED_HOSTS: "${MCP_ALLOWED_HOSTS:-}"
+      MCP_CORS_ALLOW_ORIGINS: "${MCP_CORS_ALLOW_ORIGINS:-http://localhost:3000}"
+      DEBUG: "${DEBUG:-false}"
+      ENV: "${ENV:-prod}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      PYTHONUNBUFFERED: "1"
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./cognee-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_LOCAL_API_URL: "${NEXT_PUBLIC_LOCAL_API_URL:-http://localhost:8000}"
+        NEXT_PUBLIC_BACKEND_API_URL: "${NEXT_PUBLIC_BACKEND_API_URL:-http://localhost:8000}"
+        NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT: "${NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT:-false}"
+    restart: unless-stopped
+    depends_on:
+      cognee:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_LOCAL_API_URL: "${NEXT_PUBLIC_LOCAL_API_URL:-http://localhost:8000}"
+      NEXT_PUBLIC_BACKEND_API_URL: "${NEXT_PUBLIC_BACKEND_API_URL:-http://localhost:8000}"
+      NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT: "${NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT:-false}"
+
+volumes:
+  cognee_postgres_data:
+  cognee_system:
+  cognee_data:
+  fastembed_cache:
